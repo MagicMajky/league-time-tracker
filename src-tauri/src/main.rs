@@ -5,6 +5,7 @@ use std::{sync::Mutex, time::Instant};
 // use::sysinfo::{System, SystemExt, ProcessExt};
 use sysinfo::System;
 use tauri::{window, CustomMenuItem, Event, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, UserAttentionType};
+use std::{thread, time};
 struct AppState {
   system: Mutex<System>,
   client_start: Mutex<Option<Instant>>,
@@ -18,6 +19,12 @@ fn main() {
     game_start: Mutex::new(None),
   };
 
+  let update_thread = thread::spawn(move || {
+    loop {
+      print_process_info(&state);
+      thread::sleep(time::Duration::from_secs(1));
+    }
+  });
   let quit = CustomMenuItem::new("quit".to_string(), "Quit");
   let hide = CustomMenuItem::new("hide".to_string(), "Hide");
   let tray_menu = SystemTrayMenu::new()
@@ -25,6 +32,7 @@ fn main() {
     .add_native_item(SystemTrayMenuItem::Separator)
     .add_item(hide);
   let system_tray = SystemTray::new().with_menu(tray_menu);
+
 
   tauri::Builder::default()
     .system_tray(system_tray)
@@ -56,8 +64,8 @@ fn main() {
       }
       _ => {}
     })
-    .manage(state)
-    .invoke_handler(tauri::generate_handler![print_process_info])
+    // .manage(state)
+    // .invoke_handler(tauri::generate_handler![print_process_info])
     .build(tauri::generate_context!())
     .expect("error while building application")
     .run(|_app_handle, event| match event {
@@ -68,8 +76,7 @@ fn main() {
     })
 }
 
-#[tauri::command]
-fn print_process_info(state:tauri::State<'_,AppState>){
+fn print_process_info(state: &AppState){
   let mut system = state.system.lock().unwrap();
   system.refresh_processes();
   let mut client_start = state.client_start.lock().unwrap();
